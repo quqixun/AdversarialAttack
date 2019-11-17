@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 
 from tqdm import *
 from imageio import imread
+from torchvision import models
 from matplotlib_venn import venn2
 from torch.autograd import Variable
-from torchvision import models, transforms
 
 
 MEAN = np.array([0.485, 0.456, 0.406])

@@ -15,6 +15,9 @@ MEAN = np.array([0.485, 0.456, 0.406])
 STD = np.array([0.229, 0.224, 0.225])
 
 output_dir = '../data/eda'
+if not os.path.isdir(output_dir):
+    os.makedirs(output)
+
 images_dir = '../data/images'
 dev = pd.read_csv('../data/dev.csv')
 
@@ -93,9 +96,5 @@ pred_df = pd.DataFrame(data=imagenet_pred, columns=pred_columns)
 pred_csv = os.path.join(output_dir, 'pred.csv')
 pred_df.to_csv(pred_csv, index=False)
 
-dev_correct = pred_df.copy()
-for i, row in dev_correct.iterrows():
-    if row['TrueLabel'] != row['Pred']:
-        dev_correct.loc[i, 'TrueLabel'] = row['Pred']
-dev_correct.drop(columns=['Pred'], inplace=True)
-dev_correct.to_csv('../data/dev_correct.csv', index=False)
+acc = np.sum((pred_df['TrueLabel'] == pred_df['Pred']).values * 1) / len(pred_df)
+print('Inception V3 Accuracy: {:.6f}'.format(acc))

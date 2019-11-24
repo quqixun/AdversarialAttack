@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 
 from tqdm import *
 from imageio import imread
-from torchvision import models
 from matplotlib_venn import venn2
 from torch.autograd import Variable
+from attack_models import inception_v3
 
 
 MEAN = np.array([0.485, 0.456, 0.406])
@@ -21,13 +21,6 @@ if not os.path.isdir(output_dir):
 images_dir = '../data/images'
 dev = pd.read_csv('../data/dev.csv')
 
-imagenet_classes_txt = '../data/imagenet_classes.txt'
-with open(imagenet_classes_txt, 'r') as f:
-    lines = f.readlines()
-imagenet_classes = {}
-for line in lines:
-    class_info = line.strip().split()[1:]
-    imagenet_classes[int(class_info[0])] = class_info[1]
 
 true_classes = dev['TrueLabel'].unique()
 true_classes_count = dev['TrueLabel'].value_counts()
@@ -58,7 +51,7 @@ plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'venn.png'))
 plt.close()
 
-model = models.inception_v3(pretrained=True)
+model = inception_v3(pretrained=True)
 model.eval()
 
 imagenet_pred = []
@@ -74,16 +67,15 @@ for _, row in tqdm(dev.iterrows(), total=len(dev), ncols=75):
     image_ = np.expand_dims(image_, 0)
 
     image_var = Variable(torch.Tensor(image_))
-    pred = model(image_var)
+    pred, _ = model(image_var)
     pred = torch.softmax(pred, dim=1)
     pred = pred.data.cpu().numpy().flatten()
-    class_idx = np.argmax(pred) + 1
-    pred_class = imagenet_classes[class_idx]
+    pred_class = np.argmax(pred) + 1
 
-    imagenet_pred.append([image_name, true_class, target_class, class_idx])
+    imagenet_pred.append([image_name, true_class, target_class, pred_class])
 
-    # title_str = '{}\n{}({}-{}) --> {}'.format(
-    #     image_name, true_class, pred_class, class_idx, target_class)
+    # title_str = '{}\n{}({}) --> {}'.format(
+    #     image_name, true_class, pred_class, target_class)
     # plt.figure()
     # plt.title(title_str)
     # plt.imshow(image)
@@ -98,3 +90,4 @@ pred_df.to_csv(pred_csv, index=False)
 
 acc = np.sum((pred_df['TrueLabel'] == pred_df['Pred']).values * 1) / len(pred_df)
 print('Inception V3 Accuracy: {:.6f}'.format(acc))
+# Inception V3 Accuracy: 0.982730

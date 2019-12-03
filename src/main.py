@@ -129,40 +129,52 @@ if __name__ == '__main__':
     import pandas as pd
 
     from tqdm import *
-    from imageio import imwrite
-    from attack_utils import create_dir
+    # from imageio import imwrite
+    # from attack_utils import create_dir
     from torchvision.models import inception_v3
-    # from pretrainedmodels import inceptionv4, inceptionresnetv2
+    from pretrainedmodels import inceptionv4, inceptionresnetv2
 
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
     images_dir = '../data/images'
     data = pd.read_csv('../data/dev.csv')
-    adv_images_dir = '../data/white_adv_images'
-    create_dir(adv_images_dir)
+    # adv_images_dir = '../data/white_adv_images'
+    # create_dir(adv_images_dir)
 
-    attack = AttackWhiteBox(
-        model=inception_v3(pretrained=True),
-        # model=inceptionv4(pretrained='imagenet'),
-        # model=inceptionresnetv2(pretrained='imagenet'),
-        input_size=299, pixel_limit=32,
-        epsilon=16, alpha=1, num_iters=50,
-        early_stopping=None, num_threads=2
-    )
+    models = {
+        'inception-v3': inception_v3(pretrained=True),
+        'inception-v4': inceptionv4(pretrained='imagenet'),
+        'inception-resnet-v2': inceptionresnetv2(pretrained='imagenet')
+    }
 
-    scores = []
-    for i, sample in tqdm(data.iterrows(), total=len(data), ncols=80):
-        true_label = sample['TrueLabel']
-        target_label = sample['TargetClass']
+    for model_name, model in models.items():
+        attack = AttackWhiteBox(
+            model=model,
+            input_size=299, pixel_limit=32,
+            epsilon=16, alpha=1, num_iters=300,
+            early_stopping=20, num_threads=2
+        )
 
-        image_path = os.path.join(images_dir, sample['ImageId'])
-        adv_image, score = attack(image_path, true_label, target=False, return_score=True)
-        # adv_image, score = attack(image_path, target_label, target=True, return_score=True)
-        scores.append(score)
+        print('-' * 75)
+        print('Attacking - Model[{}]'.format(model_name))
+        scores = []
+        for i, sample in tqdm(data.iterrows(), total=len(data), ncols=75):
+            true_label = sample['TrueLabel']
+            target_label = sample['TargetClass']
 
-        adv_image_path = os.path.join(adv_images_dir, sample['ImageId'])
-        imwrite(adv_image_path, adv_image)
-        break
+            image_path = os.path.join(images_dir, sample['ImageId'])
+            adv_image, score = attack(image_path, true_label, target_label, return_score=True)
+            scores.append(score)
 
-    mean_score = np.mean(scores)
-    print('Attack Score: {:.6f}'.format(mean_score))
+            # adv_image_path = os.path.join(adv_images_dir, sample['ImageId'])
+            # imwrite(adv_image_path, adv_image)
+
+        mean_score = np.mean(scores)
+        print('\nAttack Score: {:.6f}'.format(mean_score))
+        print('-' * 75)
+
+    # Model Epsilon Alpha Ccore
+    # 32 1
+    # 32 5
+    # 16 1
+    # 16 5

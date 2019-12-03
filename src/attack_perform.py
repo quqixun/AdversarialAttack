@@ -6,8 +6,8 @@ import pandas as pd
 from tqdm import *
 from PIL import Image
 from imageio import imread
-from numpy.linalg import norm
 from torchvision import transforms
+from attack_utils import compute_score
 
 
 class AttackPerform(object):
@@ -19,7 +19,6 @@ class AttackPerform(object):
 
         self.preprocess = transforms.Compose([
             transforms.Resize(input_size),
-            transforms.CenterCrop(input_size),
             transforms.ToTensor(),
             transforms.Normalize(
                 mean=[0.485, 0.456, 0.406],
@@ -27,10 +26,9 @@ class AttackPerform(object):
             ),
         ])
 
-        self.model = model
+        self.model = model.eval()
         if self.use_cuda:
             self.model.cuda()
-        self.model.eval()
         return
 
     def by_original(self, image_path, true_label):
@@ -38,24 +36,18 @@ class AttackPerform(object):
         is_correct = (pred_label == true_label) * 1.0
         return pred_label, is_correct
 
-    def by_adversarial(self, image_path, adv_image_path, true_label, target_label):
-        score = 0
-        image = imread(image_path).astype(float).flatten()
-        adv_image = imread(adv_image_path).astype(float).flatten()
-        norm_score = norm(adv_image - image, ord=np.inf)
-
+    def by_adversarial(self, image_path, adv_image_path, true_label, target_label, return_score=False):
+        image = imread(image_path)
+        adv_image = imread(adv_image_path)
         pred_label = self.forward(adv_image_path)
-        if pred_label == true_label:
-            score = 0
-        elif pred_label != true_label and pred_label != target_label:
-            score = 2 * (2 - norm_score / self.pixel_limit)
-        elif pred_label == target_label:
-            score = 5 * (2 - norm_score / self.pixel_limit)
-        else:
-            pass
-
         is_correct = (pred_label == target_label) * 1.0
-        return pred_label, is_correct, score
+
+        if not return_score:
+            return pred_label, is_correct
+        else:
+            score = compute_score(image, adv_image, pred_label, true_label,
+                                  target_label, self.pixel_limit)
+            return pred_label, is_correct, score
 
     def forward(self, image_path):
         image = self.preprocess(Image.open(image_path))
@@ -70,10 +62,10 @@ class AttackPerform(object):
         return pred_label
 
 
-def predict_original(data, model, images_dir, model_name):
+def predict_original(data, model, images_dir, input_size, model_name):
     print('-' * 75)
     print('Test {} by original images'.format(model_name))
-    attack = AttackPerform(model=model, input_size=299, use_cuda=True)
+    attack = AttackPerform(model=model, input_size=input_size, use_cuda=True)
 
     num_correct = 0
     for _, row in tqdm(data.iterrows(), total=len(data), ncols=75):
@@ -88,10 +80,10 @@ def predict_original(data, model, images_dir, model_name):
     return
 
 
-def predict_adversarial(data, model, images_dir, adv_images_dir, model_name):
+def predict_adversarial(data, model, images_dir, adv_images_dir, input_size, model_name):
     print('-' * 75)
     print('Test {} by adversarial images'.format(model_name))
-    attack = AttackPerform(model=model, input_size=299, use_cuda=True)
+    attack = AttackPerform(model=model, input_size=input_size, use_cuda=True)
 
     num_correct, scores = 0, []
     for _, sample in tqdm(data.iterrows(), total=len(data), ncols=75):
@@ -101,7 +93,7 @@ def predict_adversarial(data, model, images_dir, adv_images_dir, model_name):
         adv_image_path = os.path.join(adv_images_dir, sample['ImageId'])
 
         pred_label, is_correct, score = \
-            attack.by_adversarial(image_path, adv_image_path, true_label, target_label)
+            attack.by_adversarial(image_path, adv_image_path, true_label, target_label, return_score=True)
         num_correct += is_correct
         scores.append(score)
 
@@ -121,15 +113,15 @@ if __name__ == '__main__':
     images_dir = '../data/images'
     adv_images_dir = '../data/adv_images'
     data = pd.read_csv('../data/dev.csv')
-    models = {
-        'inception-v3': inception_v3(pretrained=True),
-        'inception-v4': inceptionv4(pretrained='imagenet'),
-        'inception-resnet-v2': inceptionresnetv2(pretrained='imagenet')
-    }
+    models = [
+        ['inception-v3', inception_v3(pretrained=True), 299],
+        ['inception-v4', inceptionv4(pretrained='imagenet'), 299],
+        ['inception-resnet-v2', inceptionresnetv2(pretrained='imagenet'), 299]
+    ]
 
     # Original images
-    # for model_name, model in models.items():
-    #     predict_original(data, model, images_dir, model_name)
+    for model_name, model, input_size in models:
+        predict_original(data, model, images_dir, input_size, model_name)
 
     #         Model        |   Accuracy(true)
     # ------------------------------------------
@@ -138,8 +130,8 @@ if __name__ == '__main__':
     #  inceptionresnet v2  |     0.988487
 
     # Adversarial images
-    for model_name, model in models.items():
-        predict_adversarial(data, model, images_dir, adv_images_dir, model_name)
+    # for model_name, model, input_size in models:
+    #     predict_adversarial(data, model, images_dir, adv_images_dir, input_size, model_name)
 
     #         Model        |   Accuracy(target)   |    Score
     # ----------------------------------------------------------

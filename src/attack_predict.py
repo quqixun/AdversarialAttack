@@ -10,7 +10,7 @@ class AttackPredict(object):
     MEAN = np.array([0.485, 0.456, 0.406])
     STD = np.array([0.229, 0.224, 0.225])
 
-    def __init__(self, model, input_size=299, class_label=None,
+    def __init__(self, model, input_size=224, class_label=None,
                  use_cuda=True, num_threads=1):
         torch.set_num_threads(num_threads)
         self.use_cuda = torch.cuda.is_available() and use_cuda
@@ -19,7 +19,7 @@ class AttackPredict(object):
             transforms.Resize(input_size),
             transforms.CenterCrop(input_size),
             transforms.ToTensor(),
-            transforms.Normalize(mean=self.MEAN, std=self.STD),
+            transforms.Normalize(self.MEAN, self.STD),
         ])
 
         self.model = model.eval()
@@ -31,6 +31,7 @@ class AttackPredict(object):
 
     def run(self, image_path):
         image = self.preprocess(Image.open(image_path))
+
         image = image.unsqueeze(0)
         if self.use_cuda:
             image = image.cuda()

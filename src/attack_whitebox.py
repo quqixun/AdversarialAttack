@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import torch.nn as nn
 
+from tqdm import *
 from PIL import Image
 from torchvision import transforms
 
@@ -14,8 +15,20 @@ class AttackWhiteBox(object):
     RANGE = np.array([[-2.1179, 2.2489], [-2.0357, 2.4285], [-1.8044, 2.6400]])
 
     def __init__(self, model, input_size=299, epsilon=16, alpha=5,
-                 num_iters=50, early_stopping=None, num_threads=1,
-                 use_cuda=True):
+                 num_iters=50, early_stopping=None, num_threads=1, use_cuda=True):
+        '''__INIT__
+
+            model: model instance of pytorch
+            input_size: int, size of input tentor to model
+            epsilon: int
+            alpha: int
+            num_iters: int
+            early_stopping: int ot None
+            num_threads: int, number of threads to use
+            use_cuda: bool, True or False, whether to use GPU
+
+        '''
+
         torch.set_num_threads(num_threads)
 
         self.alpha = alpha / 255
@@ -26,6 +39,7 @@ class AttackWhiteBox(object):
 
         self.preprocess = transforms.Compose([
             transforms.Resize(input_size),
+            transforms.CenterCrop(input_size),
             transforms.ToTensor(),
             transforms.Normalize(self.MEAN, self.STD),
         ])
@@ -38,29 +52,35 @@ class AttackWhiteBox(object):
                 m.cuda()
         self.model = model
 
-        # self.model = model.eval()
-        # if self.use_cuda:
-        #     self.model.cuda()
-
+        self.l1_loss = nn.SmoothL1Loss()
         self.ce_loss = nn.CrossEntropyLoss()
-        self.l1_loss = nn.L1Loss()
         return
 
     def __call__(self, image_path, label, target=False):
-        self.target = target
-        adv_image, pred_label = self.forward(image_path, label)
-        adv_image_uint8 = adv_image.astype(np.uint8)
-        return adv_image_uint8, pred_label
+        '''__CALL__
 
-    def forward(self, image_path, label):
-        image = self.preprocess(Image.open(image_path)).unsqueeze(0)
+            image_path: string, path of input image
+            label: int, the true label of input image if target is False,
+                   the target label to learn if target is True
+            target: bool, if True, perform target adversarial attack;
+                    if False, perform non-target adversarial attack
+
+        '''
+
+        self.target = target
+        src_image = Image.open(image_path)
+        adv_image, pred_label = self.forward(src_image, label)
+        return adv_image, pred_label
+
+    def forward(self, src_image, label):
+        image = self.preprocess(src_image).unsqueeze(0)
         origin = image.clone().detach()
-        label = torch.LongTensor([label - 1])
+        label = torch.LongTensor([label])
         if self.use_cuda:
             image, origin, label = image.cuda(), origin.cuda(), label.cuda()
 
         num_no_improve, best_loss, best_adv_image = 0, None, None
-        for i in range(self.num_iters):
+        for i in tqdm(range(self.num_iters), ncols=75):
             image.requires_grad = True
             pred = [m(image) for m in self.model]
             loss = self.__loss(pred, label, image, origin)
@@ -72,6 +92,7 @@ class AttackWhiteBox(object):
             else:
                 num_no_improve += 1
             if self.__stop(num_no_improve):
+                print('\nEarly stopped.')
                 break
 
             image = self.__PGD(loss, image, origin)
@@ -83,9 +104,10 @@ class AttackWhiteBox(object):
 
     def __loss(self, pred, label, image, origin):
         def compute_ce_loss(p, l):
-            ce_loss = self.ce_loss(p, l)
-            if not self.target:
-                ce_loss = 1 / torch.clamp(ce_loss, min=1e-8)
+            if self.target:
+                ce_loss = self.ce_loss(p, l)
+            else:
+                ce_loss = 1 / torch.clamp(self.ce_loss(p, l), min=1e-8)
             return ce_loss
 
         ce_loss = 0
@@ -115,67 +137,16 @@ class AttackWhiteBox(object):
         return image_clamp
 
     def __post_process(self, best_adv_image):
-        def pred_adv(model, adv_image):
-            pred = model(adv_image)
+        def pred_adv(model):
+            pred = model(best_adv_image)
             pred = torch.softmax(pred, dim=1)
-            pred = pred.data.cpu().numpy().flatten()
-            pred_label = np.argmax(pred) + 1
+            pred = pred.data.cpu().detach().numpy().flatten()
+            pred_label = np.argmax(pred)
             return pred_label
 
-        pred_label = [pred_adv(m, best_adv_image) for m in self.model]
-
-        adv_image = best_adv_image.squeeze(0).data.cpu().numpy()
+        pred_label = [pred_adv(m) for m in self.model]
+        adv_image = best_adv_image.squeeze(0).data.cpu().detach().numpy()
         adv_image = np.transpose(adv_image, (1, 2, 0))
         adv_image = adv_image * self.STD + self.MEAN
-        adv_image = np.round(adv_image * 255.0)
+        adv_image = np.round(adv_image * 255.0).astype(np.uint8)
         return adv_image, pred_label
-
-
-if __name__ == '__main__':
-    import os
-    import pandas as pd
-
-    from tqdm import *
-    from imageio import imread, imwrite
-    from attack_utils import create_dir
-    from attack_utils import compute_score
-    from torchvision.models import inception_v3
-    from pretrainedmodels import inceptionv4, inceptionresnetv2
-
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-
-    images_dir = '../data/images'
-    data = pd.read_csv('../data/dev.csv')
-    adv_images_dir = '../data/white_adv_images/inception-3'
-    create_dir(adv_images_dir)
-
-    models = [inception_v3(pretrained=True),
-              inceptionv4(pretrained='imagenet'),
-              inceptionresnetv2(pretrained='imagenet')]
-
-    attack = AttackWhiteBox(
-        model=models, input_size=299,
-        epsilon=16, alpha=1, num_iters=100,
-        early_stopping=10, num_threads=2
-    )
-
-    print('-' * 75)
-    print('Attacking - inception family')
-    scores = []
-    for i, sample in tqdm(data.iterrows(), total=len(data), ncols=75):
-        true_label = sample['TrueLabel']
-        target_label = sample['TargetClass']
-
-        image_path = os.path.join(images_dir, sample['ImageId'])
-        adv_image, pred_label = attack(image_path, target_label, target=True)
-
-        score = compute_score(imread(image_path), adv_image, pred_label,
-                              true_label, target_label, pixel_limit=32)
-        scores.append(score)
-
-        adv_image_path = os.path.join(adv_images_dir, sample['ImageId'])
-        imwrite(adv_image_path, adv_image)
-
-    mean_score = np.mean(scores)
-    print('\nAttack Score: {:.6f}'.format(mean_score))
-    print('-' * 75)

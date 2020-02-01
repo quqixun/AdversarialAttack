@@ -18,8 +18,7 @@ class_label_dict = json.load(open('../data/imagenet_class_index.json'))
 class_label = [class_label_dict[str(k)][1] for k in range(len(class_label_dict))]
 
 # Source image
-# src_image_path = '../data/panda.jpg'  # label:388
-src_image_path = '../data/central_perk.jpg'  # label:762
+src_image_path = '../data/central_perk_224.png'  # label:762
 print('Source image: [{}]'.format(src_image_path))
 
 # Model to be attacked

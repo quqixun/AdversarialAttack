@@ -40,8 +40,8 @@ wb_t_image, _ = attack_whitebox(image_path=src_image_path, label=388, target=Tru
 
 |Image|Source|Attack Model|Attack Type|Target Type|Target Label|Label|Class|Confidence|
 |:---:|:----:|:----------:|:---------:|:---------:|:----------:|:---:|:---:|:--------:|
-|<img src="./data/central_perk_224.png" alt="drawing" width="150"/>|Yes|\|\|\|\|762|restaurant|0.957634
-|<img src="./data/wb_nt_central_perk.png" alt="drawing" width="150"/>|No|ResNet18|White-box|Non-targeted|\|424|barbershop|0.978484|
+|<img src="./data/central_perk_224.png" alt="drawing" width="150"/>|Yes|-|-|-|-|762|restaurant|0.957634
+|<img src="./data/wb_nt_central_perk.png" alt="drawing" width="150"/>|No|ResNet18|White-box|Non-targeted|-|424|barbershop|0.978484|
 |<img src="./data/wb_t_central_perk.png" alt="drawing" width="150"/>|No|ResNet18|White-box|Targeted|388|388|giant_panda|0.999965|
 
 

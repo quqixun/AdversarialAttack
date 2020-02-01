@@ -14,16 +14,21 @@ class AttackWhiteBox(object):
     # RANGE: [(0 - mean) / std, (1 - mean) / std]
     RANGE = np.array([[-2.1179, 2.2489], [-2.0357, 2.4285], [-1.8044, 2.6400]])
 
-    def __init__(self, model, input_size=299, epsilon=16, alpha=5,
+    def __init__(self, model, input_size=224, epsilon=16, alpha=5,
                  num_iters=50, early_stopping=None, num_threads=1, use_cuda=True):
         '''__INIT__
 
-            model: model instance of pytorch
+            reference:
+            Kurakin A, Goodfellow I, Bengio S.
+            Adversarial examples in the physical world[J].
+            arXiv preprint arXiv:1607.02533, 2016.
+
+            model: model instance or list of model instances
             input_size: int, size of input tentor to model
-            epsilon: int
-            alpha: int
-            num_iters: int
-            early_stopping: int ot None
+            epsilon: int, limit on the perturbation size
+            alpha: int, step size for gradient-based attack
+            num_iters: int, number of iterations
+            early_stopping: int ot None, attack will not stop unless loss stops improving
             num_threads: int, number of threads to use
             use_cuda: bool, True or False, whether to use GPU
 

@@ -27,7 +27,7 @@ model, input_size = resnet18(pretrained=True), 224
 # White-box attack
 whitebox_attack = WhiteBoxAttack(
     model=model, input_size=input_size, epsilon=16, alpha=5,
-    num_iters=100, early_stopping=5
+    num_iters=100, early_stopping=5, use_cuda=True
 )
 
 # Non-targeted attack

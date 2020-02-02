@@ -1,3 +1,4 @@
+import copy
 import torch
 import numpy as np
 
@@ -10,9 +11,7 @@ class AttackPredict(object):
     MEAN = np.array([0.485, 0.456, 0.406])
     STD = np.array([0.229, 0.224, 0.225])
 
-    def __init__(self, model, input_size=224, class_label=None,
-                 use_cuda=True, num_threads=1):
-        torch.set_num_threads(num_threads)
+    def __init__(self, model, input_size=224, class_label=None, use_cuda=False):
         self.use_cuda = torch.cuda.is_available() and use_cuda
 
         self.preprocess = transforms.Compose([
@@ -22,7 +21,7 @@ class AttackPredict(object):
             transforms.Normalize(self.MEAN, self.STD),
         ])
 
-        self.model = model.eval()
+        self.model = copy.deepcopy(model).eval()
         if self.use_cuda:
             self.model.cuda()
 

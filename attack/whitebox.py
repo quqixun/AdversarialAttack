@@ -1,13 +1,13 @@
+import copy
 import torch
 import numpy as np
 import torch.nn as nn
 
-from tqdm import *
 from PIL import Image
 from torchvision import transforms
 
 
-class AttackWhiteBox(object):
+class WhiteBoxAttack(object):
 
     MEAN = np.array([0.485, 0.456, 0.406])
     STD = np.array([0.229, 0.224, 0.225])
@@ -15,7 +15,7 @@ class AttackWhiteBox(object):
     RANGE = np.array([[-2.1179, 2.2489], [-2.0357, 2.4285], [-1.8044, 2.6400]])
 
     def __init__(self, model, input_size=224, epsilon=16, alpha=5,
-                 num_iters=50, early_stopping=None, num_threads=1, use_cuda=True):
+                 num_iters=50, early_stopping=None, use_cuda=False):
         '''__INIT__
 
             reference:
@@ -29,12 +29,9 @@ class AttackWhiteBox(object):
             alpha: int, step size for gradient-based attack
             num_iters: int, number of iterations
             early_stopping: int ot None, attack will not stop unless loss stops improving
-            num_threads: int, number of threads to use
             use_cuda: bool, True or False, whether to use GPU
 
         '''
-
-        torch.set_num_threads(num_threads)
 
         self.alpha = alpha / 255
         self.num_iters = num_iters
@@ -51,6 +48,7 @@ class AttackWhiteBox(object):
 
         if not isinstance(model, list):
             model = [model]
+        model = [copy.deepcopy(m) for m in model]
         for m in model:
             m.eval()
             if self.use_cuda:
@@ -84,20 +82,26 @@ class AttackWhiteBox(object):
         if self.use_cuda:
             image, origin, label = image.cuda(), origin.cuda(), label.cuda()
 
-        num_no_improve, best_loss, best_adv_image = 0, None, None
-        for i in tqdm(range(self.num_iters), ncols=75):
+        num_no_improve, best_iter = 0, None
+        best_loss, best_adv_image = None, None
+        for i in range(self.num_iters):
             image.requires_grad = True
             pred = [m(image) for m in self.model]
             loss = self.__loss(pred, label, image, origin)
+
+            iter_msg = '[Step:{:0=3d}/{:0=3d}]-[Loss:{:12.6f}]'
+            print(iter_msg.format(i + 1, self.num_iters, loss.item()), end='\r')
 
             if best_loss is None or loss.item() < best_loss:
                 best_adv_image = image.clone()
                 best_loss = loss.item()
                 num_no_improve = 0
+                best_iter = i
             else:
                 num_no_improve += 1
             if self.__stop(num_no_improve):
-                print('\nEarly stopped.')
+                stop_msg = '\n[Early stopped]-[Step:{:0=3d}]-[Loss:{:.6f}]'
+                print(stop_msg.format(best_iter + 1, best_loss))
                 break
 
             image = self.__PGD(loss, image, origin)

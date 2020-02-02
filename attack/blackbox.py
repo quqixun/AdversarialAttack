@@ -8,7 +8,7 @@ from torchvision import transforms
 from attack_utils import compute_score
 
 
-class AttackWhiteBox(object):
+class WhiteBoxAttack(object):
 
     MEAN = np.array([0.485, 0.456, 0.406])
     STD = np.array([0.229, 0.224, 0.225])

@@ -6,10 +6,10 @@ Attack models that are pretrained on ImageNet.
 - Apply white-box attack or black-box attack.
 - Apply non-targeted attack or targeted attack.
 
-## Method
+## Methods
 
-- White-box attack: PGD[1]
-- Black-box attack: [2]
+- White-box attack: Projected Gradient Descent<sup>[1]</sup>
+- Black-box attack: Simple black-box adversarial attacks<sup>[2]</sup>
 
 ## Examples
 
@@ -47,7 +47,16 @@ wb_t_image, _ = whitebox_attack(image_path=src_image_path, label=388, target=Tru
 
 ## References
 
-[1] Kurakin A, Goodfellow I, Bengio S. Adversarial examples in the physical world[J]. arXiv preprint arXiv:1607.02533, 2016.  
-[2]
+[1] Madry A, Makelov A, Schmidt L, et al. Towards deep learning models resistant to adversarial attacks[J]. arXiv preprint arXiv:1706.06083, 2017.  
+[2] Guo C, Gardner J R, You Y, et al. Simple black-box adversarial attacks[J]. arXiv preprint arXiv:1905.07121, 2019.
 
 ## Requirements
+
+|Package|Version|Comment|
+|:-----:|:-----:|:-----:|
+|pytorch||required|
+|torchvision||required|
+|pillow||required|
+|numpy||required|
+|imageio||optional|
+|pretrainedmodels||optional|

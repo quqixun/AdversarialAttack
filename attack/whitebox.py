@@ -17,12 +17,10 @@ class WhiteBoxAttack(object):
     def __init__(self, model, input_size=224, epsilon=16, alpha=5,
                  num_iters=50, early_stopping=None, use_cuda=False):
         '''__INIT__
-
             reference:
             Kurakin A, Goodfellow I, Bengio S.
             Adversarial examples in the physical world[J].
             arXiv preprint arXiv:1607.02533, 2016.
-
             model: model instance or list of model instances
             input_size: int, size of input tentor to model
             epsilon: int, limit on the perturbation size
@@ -30,7 +28,6 @@ class WhiteBoxAttack(object):
             num_iters: int, number of iterations
             early_stopping: int ot None, attack will not stop unless loss stops improving
             use_cuda: bool, True or False, whether to use GPU
-
         '''
 
         self.alpha = alpha / 255
@@ -61,13 +58,11 @@ class WhiteBoxAttack(object):
 
     def __call__(self, image_path, label, target=False):
         '''__CALL__
-
             image_path: string, path of input image
             label: int, the true label of input image if target is False,
                    the target label to learn if target is True
             target: bool, if True, perform target adversarial attack;
                     if False, perform non-target adversarial attack
-
         '''
 
         self.target = target

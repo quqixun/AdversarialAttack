@@ -21,6 +21,7 @@ class WhiteBoxAttack(object):
             Kurakin A, Goodfellow I, Bengio S.
             Adversarial examples in the physical world[J].
             arXiv preprint arXiv:1607.02533, 2016.
+
             model: model instance or list of model instances
             input_size: int, size of input tentor to model
             epsilon: int, limit on the perturbation size

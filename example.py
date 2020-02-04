@@ -5,6 +5,7 @@ from pretrainedmodels import *
 from torchvision.models import *
 from attack.predict import AttackPredict
 from attack.whitebox import WhiteBoxAttack
+from attack.blackbox import BlackBoxAttack
 
 
 # ======================================================================================
@@ -42,42 +43,55 @@ print('-' * 75)
 
 # ======================================================================================
 
-# White-Box Adversarial Attack on source image
-whitebox_attack = WhiteBoxAttack(
-    model=model, input_size=input_size, epsilon=16, alpha=5,
-    num_iters=100, early_stopping=5, use_cuda=True
-)
-
-# 'model' also could be a list of model instances
+# # White-Box Adversarial Attack on source image
 # whitebox_attack = WhiteBoxAttack(
-#     model=[resnet18(pretrained=True), resnet34(pretrained=True)],
-#     input_size=input_size, epsilon=16, alpha=5,
+#     model=model, input_size=input_size, epsilon=16, alpha=5,
 #     num_iters=100, early_stopping=5, use_cuda=True
 # )
 
-# --------------------------------------------------------------------------------------
+# # 'model' also could be a list of model instances
+# # whitebox_attack = WhiteBoxAttack(
+# #     model=[resnet18(pretrained=True), resnet34(pretrained=True)],
+# #     input_size=input_size, epsilon=16, alpha=5,
+# #     num_iters=100, early_stopping=5, use_cuda=True
+# # )
 
-# Non-Targeted Attack
-print('White-Box Non-Targeted Adversarial Attack')
-wb_nt_image, _ = whitebox_attack(image_path=src_image_path, label=762, target=False)
-wb_nt_image_path = './data/wb_nt_central_perk.png'
-imwrite(wb_nt_image_path, wb_nt_image)
+# # --------------------------------------------------------------------------------------
 
-wb_nt_label, wb_nt_prob, wb_nt_class = predictor.run(wb_nt_image_path)
-print(result_str.format('adversarial', wb_nt_label, wb_nt_class, wb_nt_prob), '\n')
+# # Non-Targeted Attack
+# print('White-Box Non-Targeted Adversarial Attack')
+# wb_nt_image, _ = whitebox_attack(image_path=src_image_path, label=762, target=False)
+# wb_nt_image_path = './data/wb_nt_central_perk.png'
+# imwrite(wb_nt_image_path, wb_nt_image)
 
-# --------------------------------------------------------------------------------------
+# wb_nt_label, wb_nt_prob, wb_nt_class = predictor.run(wb_nt_image_path)
+# print(result_str.format('adversarial', wb_nt_label, wb_nt_class, wb_nt_prob), '\n')
 
-# Targeted Attack
-print('White-Box Targeted Adversarial Attack')
-wb_t_image, _ = whitebox_attack(image_path=src_image_path, label=388, target=True)
-wb_t_image_path = './data/wb_t_central_perk.png'
-imwrite(wb_t_image_path, wb_t_image)
+# # --------------------------------------------------------------------------------------
 
-wb_t_label, wb_t_prob, wb_t_class = predictor.run(wb_t_image_path)
-print(result_str.format('adversarial', wb_t_label, wb_t_class, wb_t_prob))
-print('-' * 75)
+# # Targeted Attack
+# print('White-Box Targeted Adversarial Attack')
+# wb_t_image, _ = whitebox_attack(image_path=src_image_path, label=388, target=True)
+# wb_t_image_path = './data/wb_t_central_perk.png'
+# imwrite(wb_t_image_path, wb_t_image)
+
+# wb_t_label, wb_t_prob, wb_t_class = predictor.run(wb_t_image_path)
+# print(result_str.format('adversarial', wb_t_label, wb_t_class, wb_t_prob))
+# print('-' * 75)
 
 # ======================================================================================
 
 # Black-Box Adversarial Attack on source image
+blackbox_attack = BlackBoxAttack(
+    model=model, input_size=input_size, epsilon=16,
+    num_iters=10000, early_stopping=5, use_cuda=True
+)
+
+blackbox_attack(src_image_path, label=762, target=False)
+
+# # 'model' also could be a list of model instances
+# # whitebox_attack = WhiteBoxAttack(
+# #     model=[resnet18(pretrained=True), resnet34(pretrained=True)],
+# #     input_size=input_size, epsilon=16, alpha=5,
+# #     num_iters=100, early_stopping=5, use_cuda=True
+# # )

@@ -96,13 +96,14 @@ class WhiteBoxAttack(object):
             else:
                 num_no_improve += 1
             if self.__stop(num_no_improve):
-                stop_msg = '\n[Early stopped]-[Step:{:0=3d}]-[Loss:{:.6f}]'
-                print(stop_msg.format(best_iter + 1, best_loss))
                 break
 
             image = self.__PGD(loss, image, origin)
             image_clamp = self.__clamp(image)
             image = image_clamp.detach()
+
+        stop_msg = '\n[Early stopped]-[Step:{:0=3d}]-[Loss:{:.6f}]'
+        print(stop_msg.format(best_iter + 1, best_loss))
 
         adv_image, pred_label = self.__post_process(best_adv_image)
         return adv_image, pred_label

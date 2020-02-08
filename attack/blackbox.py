@@ -1,7 +1,6 @@
 import copy
 import torch
 import numpy as np
-import torch.nn as nn
 
 from PIL import Image
 from torchvision import transforms
@@ -15,7 +14,7 @@ class BlackBoxAttack(object):
     RANGE = np.array([[-2.1179, 2.2489], [-2.0357, 2.4285], [-1.8044, 2.6400]])
 
     def __init__(self, model, input_size=224, epsilon=16,
-                 num_iters=50, early_stopping=None, use_cuda=False):
+                 num_iters=10000, early_stopping=False, use_cuda=False):
         '''__INIT__
             reference:
             Guo C, Gardner J R, You Y, et al.
@@ -26,7 +25,8 @@ class BlackBoxAttack(object):
             input_size: int, size of input tentor to model
             epsilon: int, limit on the perturbation size
             num_iters: int, number of iterations
-            early_stopping: int ot None, attack will not stop unless loss stops improving
+            early_stopping: bool, if True, stop at once if
+                            adversarial image has been found
             use_cuda: bool, True or False, whether to use GPU
         '''
 
@@ -34,6 +34,7 @@ class BlackBoxAttack(object):
         self.epsilon = epsilon / 255
         self.early_stopping = early_stopping
         self.use_cuda = torch.cuda.is_available() and use_cuda
+        self.nbits = int(np.ceil(np.log10(num_iters)) + 1)
 
         self.preprocess = transforms.Compose([
             transforms.Resize(input_size),
@@ -63,7 +64,6 @@ class BlackBoxAttack(object):
 
         self.target = target
         src_image = np.array(Image.open(image_path)) / 255.0
-        print(src_image.shape)
         # adv_image, pred_label = self.forward(src_image, label)
         self.forward(src_image, label)
         # return adv_image, pred_label
@@ -74,24 +74,30 @@ class BlackBoxAttack(object):
         image = image.unsqueeze(0)
         n_dims = image.view(1, -1).size(1)
         perm = torch.randperm(n_dims)
-        last_prob = self.__predict(image, label)
+        last_prob, _ = self.__predict(image, label)
 
         for i in range(self.num_iters):
             diff = torch.zeros(n_dims)
             diff[perm[i]] = self.epsilon
 
             left_image = image - diff.view(image.size()).clamp(0, 1)
-            left_prob = self.__predict(left_image, label)
+            left_prob, is_stop = self.__predict(left_image, label)
             if left_prob < last_prob:
                 image = left_image
                 last_prob = left_prob
+                if is_stop:
+                    break
             else:
                 right_image = image + diff.view(image.size()).clamp(0, 1)
-                right_prob = self.__predict(right_image, label)
+                right_prob, is_stop = self.__predict(right_image, label)
                 if right_prob < last_prob:
                     image = right_image
                     last_prob = right_prob
-            print(last_prob)
+                    if is_stop:
+                        break
+            # print(last_prob)
+            iter_msg = '[Step:{}/{}]-[Prob:{:.6f}]'
+            print(iter_msg.format(i + 1, self.num_iters, last_prob), end='\r')
         return
 
     def __predict(self, image, label):
@@ -99,13 +105,24 @@ class BlackBoxAttack(object):
             pred = model(image_norm)
             probs = torch.softmax(pred, dim=1)
             probs = probs.data.cpu().detach().numpy().flatten()
-            return probs[label]
+            pred = np.argmax(probs)
+            return probs[label], pred
 
         image_norm = self.__norm(image)
         if self.use_cuda:
             image_norm = image_norm.cuda()
-        probs = [get_prob(model, image_norm) for model in self.model]
-        return np.mean(probs)
+        prob_preds = [get_prob(model, image_norm) for model in self.model]
+        prob = np.mean([item[0] for item in prob_preds])
+        preds = [item[1] for item in prob_preds]
+
+        is_stop = False
+        if self.early_stopping:
+            if self.target and preds.count(label) == len(preds):
+                is_stop = True
+            elif (not self.target) and preds.count(label) == 0:
+                is_stop = True
+
+        return prob, is_stop
 
     def __norm(self, image):
         image_cp = image.clone()

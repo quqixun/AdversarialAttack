@@ -84,7 +84,7 @@ print('-' * 75)
 # Black-Box Adversarial Attack on source image
 blackbox_attack = BlackBoxAttack(
     model=model, input_size=input_size, epsilon=16,
-    num_iters=10000, early_stopping=5, use_cuda=True
+    num_iters=10000, early_stopping=True, use_cuda=True
 )
 
 blackbox_attack(src_image_path, label=762, target=False)

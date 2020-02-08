@@ -95,9 +95,13 @@ class BlackBoxAttack(object):
                     last_prob = right_prob
                     if is_stop:
                         break
-            # print(last_prob)
-            iter_msg = '[Step:{}/{}]-[Prob:{:.6f}]'
+
+            iter_msg = '[Running]-[Step:{}/{}]-[Prob:{:.6f}]'
             print(iter_msg.format(i + 1, self.num_iters, last_prob), end='\r')
+
+        iter_msg = '\n[Stopped]-[Step:{}/{}]-[Prob:{:.6f}]'
+        print(iter_msg.format(i + 1, self.num_iters, last_prob))
+
         return
 
     def __predict(self, image, label):

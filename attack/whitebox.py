@@ -85,7 +85,7 @@ class WhiteBoxAttack(object):
             pred = [m(image) for m in self.model]
             loss = self.__loss(pred, label, image, origin)
 
-            iter_msg = '[Step:{:0=3d}/{:0=3d}]-[Loss:{:12.6f}]'
+            iter_msg = '[Running]-[Step:{:0=3d}/{:0=3d}]-[Loss:{:12.6f}]'
             print(iter_msg.format(i + 1, self.num_iters, loss.item()), end='\r')
 
             if best_loss is None or loss.item() < best_loss:
@@ -102,7 +102,7 @@ class WhiteBoxAttack(object):
             image_clamp = self.__clamp(image)
             image = image_clamp.detach()
 
-        stop_msg = '\n[Early stopped]-[Step:{:0=3d}]-[Loss:{:.6f}]'
+        stop_msg = '\n[Stopped]-[Step:{:0=3d}]-[Loss:{:.6f}]'
         print(stop_msg.format(best_iter + 1, best_loss))
 
         adv_image, pred_label = self.__post_process(best_adv_image)

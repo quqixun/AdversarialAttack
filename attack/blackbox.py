@@ -10,11 +10,9 @@ class BlackBoxAttack(object):
 
     MEAN = np.array([0.485, 0.456, 0.406])
     STD = np.array([0.229, 0.224, 0.225])
-    # RANGE: [(0 - mean) / std, (1 - mean) / std]
-    RANGE = np.array([[-2.1179, 2.2489], [-2.0357, 2.4285], [-1.8044, 2.6400]])
 
-    def __init__(self, model, input_size=224, epsilon=16,
-                 num_iters=10000, early_stopping=False, use_cuda=False):
+    def __init__(self, model, input_size=224, epsilon=16, num_iters=10000,
+                 early_stopping=False, use_cuda=False, random_state=None):
         '''__INIT__
             reference:
             Guo C, Gardner J R, You Y, et al.
@@ -28,10 +26,12 @@ class BlackBoxAttack(object):
             early_stopping: bool, if True, stop at once if
                             adversarial image has been found
             use_cuda: bool, True or False, whether to use GPU
+            random_state: int or None, for reproducing
         '''
 
         self.num_iters = num_iters
-        self.epsilon = epsilon / 255
+        self.epsilon = epsilon
+        # self.epsilon = epsilon / 255
         self.early_stopping = early_stopping
         self.use_cuda = torch.cuda.is_available() and use_cuda
         self.nbits = int(np.ceil(np.log10(num_iters)) + 1)
@@ -51,11 +51,14 @@ class BlackBoxAttack(object):
             if self.use_cuda:
                 m.cuda()
         self.model = model
+
+        if random_state is not None:
+            np.random.seed(seed=random_state)
         return
 
     def __call__(self, image_path, label, target=False):
         '''__CALL__
-            image_path: string, path of input image
+            image_path: string, path of uint8 input image
             label: int, the true label of input image if target is False,
                    the target label to learn if target is True
             target: bool, if True, perform target adversarial attack;
@@ -63,46 +66,46 @@ class BlackBoxAttack(object):
         '''
 
         self.target = target
-        src_image = np.array(Image.open(image_path)) / 255.0
-        # adv_image, pred_label = self.forward(src_image, label)
-        self.forward(src_image, label)
-        # return adv_image, pred_label
-        return
+        src_image = np.array(Image.open(image_path))
+        adv_image = self.forward(src_image, label)
+        return adv_image.astype(np.uint8)
 
     def forward(self, src_image, label):
-        image = torch.Tensor(src_image)
-        image = image.unsqueeze(0)
-        n_dims = image.view(1, -1).size(1)
-        perm = torch.randperm(n_dims)
+        image = src_image.copy().astype(float)
+        n_dims = len(image.flatten())
+        perm = np.random.permutation(n_dims)
         last_prob, _ = self.__predict(image, label)
+        is_better = np.greater if self.target else np.less
 
-        for i in range(self.num_iters):
-            diff = torch.zeros(n_dims)
+        num_iters = min([self.num_iters, len(perm)])
+        for i in range(num_iters):
+            diff = np.zeros((n_dims))
             diff[perm[i]] = self.epsilon
+            diff = diff.reshape(image.shape)
 
-            left_image = image - diff.view(image.size()).clamp(0, 1)
+            left_image = np.clip(image - diff, 0.0, 255.0)
             left_prob, is_stop = self.__predict(left_image, label)
-            if left_prob < last_prob:
-                image = left_image
+            if is_stop or is_better(left_prob, last_prob):
+                image = left_image.copy()
                 last_prob = left_prob
                 if is_stop:
                     break
             else:
-                right_image = image + diff.view(image.size()).clamp(0, 1)
+                right_image = np.clip(image + diff, 0.0, 255.0)
                 right_prob, is_stop = self.__predict(right_image, label)
-                if right_prob < last_prob:
-                    image = right_image
+                if is_stop or is_better(right_prob, last_prob):
+                    image = right_image.copy()
                     last_prob = right_prob
                     if is_stop:
                         break
 
             iter_msg = '[Running]-[Step:{}/{}]-[Prob:{:.6f}]'
-            print(iter_msg.format(i + 1, self.num_iters, last_prob), end='\r')
+            print(iter_msg.format(i + 1, num_iters, last_prob), end='\r')
 
         iter_msg = '\n[Stopped]-[Step:{}/{}]-[Prob:{:.6f}]'
-        print(iter_msg.format(i + 1, self.num_iters, last_prob))
+        print(iter_msg.format(i + 1, num_iters, last_prob))
 
-        return
+        return image
 
     def __predict(self, image, label):
         def get_prob(model, image_norm):
@@ -116,7 +119,8 @@ class BlackBoxAttack(object):
         if self.use_cuda:
             image_norm = image_norm.cuda()
         prob_preds = [get_prob(model, image_norm) for model in self.model]
-        prob = np.mean([item[0] for item in prob_preds])
+        probs = [item[0] for item in prob_preds]
+        prob = min(probs) if self.target else max(probs)
         preds = [item[1] for item in prob_preds]
 
         is_stop = False
@@ -129,33 +133,7 @@ class BlackBoxAttack(object):
         return prob, is_stop
 
     def __norm(self, image):
-        image_cp = image.clone()
-        image_cp = image_cp.squeeze(0).permute(2, 0, 1)
-        image_cp = transforms.ToPILImage()(image_cp)
+        image_cp = Image.fromarray(image.astype(np.uint8))
         image_norm = self.preprocess(image_cp)
         image_norm = image_norm.unsqueeze(0)
         return image_norm
-
-    # def __clamp(self, image):
-    #     image_clamp = []
-    #     for i in range(image.size()[1]):
-    #         cmin, cmax = self.RANGE[i]
-    #         image_i = torch.clamp(image[0][i], min=cmin, max=cmax)
-    #         image_clamp.append(image_i)
-    #     image_clamp = torch.stack(image_clamp, dim=0).unsqueeze(0)
-    #     return image_clamp
-
-    # def __post_process(self, best_adv_image):
-    #     def pred_adv(model):
-    #         pred = model(best_adv_image)
-    #         pred = torch.softmax(pred, dim=1)
-    #         pred = pred.data.cpu().detach().numpy().flatten()
-    #         pred_label = np.argmax(pred)
-    #         return pred_label
-
-    #     pred_label = [pred_adv(m) for m in self.model]
-    #     adv_image = best_adv_image.squeeze(0).data.cpu().detach().numpy()
-    #     adv_image = np.transpose(adv_image, (1, 2, 0))
-    #     adv_image = adv_image * self.STD + self.MEAN
-    #     adv_image = np.round(adv_image * 255.0).astype(np.uint8)
-    #     return adv_image, pred_label

@@ -76,7 +76,7 @@ Tests are done in the environment with following packages.
 
 |Package|Version|Is Required?|
 |:-----:|:-----:|:-----:|
-|pytorch|>=1.3|required|
+|pytorch|>=1.3.0|required|
 |torchvision|>=0.4.2|required|
 |pillow|>=6.2.0|required|
 |numpy|>=1.15.4|required|

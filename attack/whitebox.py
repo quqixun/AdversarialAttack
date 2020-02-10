@@ -68,8 +68,8 @@ class WhiteBoxAttack(object):
 
         self.target = target
         src_image = Image.open(image_path)
-        adv_image, pred_label = self.forward(src_image, label)
-        return adv_image, pred_label
+        adv_image = self.forward(src_image, label)
+        return adv_image
 
     def forward(self, src_image, label):
         image = self.preprocess(src_image).unsqueeze(0)
@@ -105,8 +105,8 @@ class WhiteBoxAttack(object):
         stop_msg = '\n[Stopped]-[Step:{:0=3d}]-[Loss:{:.6f}]'
         print(stop_msg.format(best_iter + 1, best_loss))
 
-        adv_image, pred_label = self.__post_process(best_adv_image)
-        return adv_image, pred_label
+        adv_image = self.__post_process(best_adv_image)
+        return adv_image
 
     def __loss(self, pred, label, image, origin):
         def compute_ce_loss(p, l):
@@ -143,16 +143,8 @@ class WhiteBoxAttack(object):
         return image_clamp
 
     def __post_process(self, best_adv_image):
-        def pred_adv(model):
-            pred = model(best_adv_image)
-            pred = torch.softmax(pred, dim=1)
-            pred = pred.data.cpu().detach().numpy().flatten()
-            pred_label = np.argmax(pred)
-            return pred_label
-
-        pred_label = [pred_adv(m) for m in self.model]
         adv_image = best_adv_image.squeeze(0).data.cpu().detach().numpy()
         adv_image = np.transpose(adv_image, (1, 2, 0))
         adv_image = adv_image * self.STD + self.MEAN
         adv_image = np.round(adv_image * 255.0).astype(np.uint8)
-        return adv_image, pred_label
+        return adv_image
